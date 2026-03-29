@@ -1,8 +1,13 @@
 const Stripe = require('stripe')
-const stripe = Stripe(process.env.STRIPE_SECRET_KEY)
 const { db, admin } = require('../firestore')
 
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000'
+
+function getStripeClient() {
+  const secret = process.env.STRIPE_SECRET_KEY
+  if (!secret) return null
+  return Stripe(secret)
+}
 
 // Mirrors the bundle discount logic from the frontend store
 function calculateBundleDiscount(cart) {
@@ -19,9 +24,14 @@ async function createCheckoutSession(req, res) {
   const userId = req.user.id
   const userName = req.user.name || req.user.email
   const userEmail = req.user.email
+  const stripe = getStripeClient()
 
   if (!cart || cart.length === 0) {
     return res.status(400).json({ message: 'Cart is empty' })
+  }
+
+  if (!stripe) {
+    return res.status(500).json({ message: 'Stripe is not configured on server' })
   }
 
   try {
@@ -86,9 +96,14 @@ async function createCheckoutSession(req, res) {
 
 async function confirmCheckoutSession(req, res) {
   const { sessionId } = req.params
+  const stripe = getStripeClient()
 
   if (!sessionId) {
     return res.status(400).json({ message: 'Session ID required' })
+  }
+
+  if (!stripe) {
+    return res.status(500).json({ message: 'Stripe is not configured on server' })
   }
 
   try {

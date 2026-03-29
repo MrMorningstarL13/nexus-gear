@@ -1,8 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-
-// API Base URL
-const API_BASE = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8080'
+import { buildApiUrl } from './api-base'
 
 // Types
 export type Category = 'mice' | 'keyboards' | 'headsets' | 'mousepads'
@@ -65,7 +63,7 @@ export interface QuizState {
 // API Functions
 const apiRequest = async (endpoint: string, options?: RequestInit) => {
   const token = localStorage.getItem('token')
-  const response = await fetch(`${API_BASE}${endpoint}`, {
+  const response = await fetch(buildApiUrl(endpoint), {
     headers: {
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),

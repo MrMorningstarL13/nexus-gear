@@ -5,6 +5,7 @@ import { useStore } from '@/lib/store';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert } from '@/components/ui/alert';
+import { buildApiUrl } from '@/lib/api-base';
 
 export default function CheckoutPage() {
   const { cart, getCartTotal, getBundleDiscount, user, clearCart } = useStore();
@@ -20,7 +21,7 @@ export default function CheckoutPage() {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:8080/api/stripe/checkout', {
+      const res = await fetch(buildApiUrl('/api/stripe/checkout'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

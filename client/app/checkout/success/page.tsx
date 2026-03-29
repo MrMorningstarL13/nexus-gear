@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { CheckCircle, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { buildApiUrl } from '@/lib/api-base'
 
 function CheckoutSuccessContent() {
   const searchParams = useSearchParams()
@@ -19,7 +20,7 @@ function CheckoutSuccessContent() {
     const confirm = async () => {
       try {
         const token = localStorage.getItem('token')
-        const res = await fetch(`http://localhost:8080/api/stripe/confirm/${sessionId}`, {
+        const res = await fetch(buildApiUrl(`/api/stripe/confirm/${sessionId}`), {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         })
         if (!res.ok) {

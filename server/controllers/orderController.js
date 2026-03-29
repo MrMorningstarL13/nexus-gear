@@ -1,7 +1,12 @@
 const PDFDocument = require('pdfkit')
 const Stripe = require('stripe')
 const { db, admin } = require('../firestore')
-const stripe = Stripe(process.env.STRIPE_SECRET_KEY)
+
+function getStripeClient() {
+  const secret = process.env.STRIPE_SECRET_KEY
+  if (!secret) return null
+  return Stripe(secret)
+}
 
 // Fallback data when Firestore is not available
 const fallbackOrders = [
@@ -178,6 +183,7 @@ async function listUserOrders(req, res) {
 async function getOrderInvoice(req, res) {
   const { id } = req.params
   const disposition = req.query.disposition === 'download' ? 'attachment' : 'inline'
+  const stripe = getStripeClient()
 
   try {
     const docRef = db.collection('orders').doc(id)
@@ -202,7 +208,7 @@ async function getOrderInvoice(req, res) {
       order.shippingDetails &&
       (order.shippingDetails.name || order.shippingDetails.addressLine1 || order.shippingDetails.city || order.shippingDetails.country)
     )
-    if (!hasShipping && order.stripeSessionId) {
+    if (!hasShipping && order.stripeSessionId && stripe) {
       try {
         const session = await stripe.checkout.sessions.retrieve(order.stripeSessionId)
         const shippingDetails = extractShippingFromStripeSession(session)

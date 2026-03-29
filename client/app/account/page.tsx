@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card'
 import { Navbar } from '@/components/navbar'
 import { Footer } from '@/components/footer'
 import { useStore } from '@/lib/store'
+import { buildApiUrl } from '@/lib/api-base'
 
 export default function AccountPage() {
   const router = useRouter()
@@ -78,7 +79,7 @@ export default function AccountPage() {
   const openInvoice = async (orderId: string, disposition: 'inline' | 'download') => {
     try {
       const token = localStorage.getItem('token')
-      const res = await fetch(`http://localhost:8080/api/orders/${orderId}/invoice?disposition=${disposition === 'download' ? 'download' : 'inline'}`, {
+      const res = await fetch(buildApiUrl(`/api/orders/${orderId}/invoice?disposition=${disposition === 'download' ? 'download' : 'inline'}`), {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
 
