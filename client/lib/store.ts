@@ -47,6 +47,9 @@ export interface Order {
   items: CartItem[]
   total: number
   status: 'awaiting_payment' | 'pending' | 'processing' | 'shipped' | 'delivered'
+  stripeInvoiceId?: string | null
+  stripeHostedInvoiceUrl?: string | null
+  stripeInvoicePdfUrl?: string | null
   createdAt: string | { toDate?: () => Date; _seconds?: number; seconds?: number }
 }
 

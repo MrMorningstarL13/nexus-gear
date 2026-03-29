@@ -108,6 +108,45 @@ function extractShippingFromStripeSession(session) {
   }
 }
 
+function extractInvoiceLinks(invoice) {
+  if (!invoice || typeof invoice !== 'object') {
+    return {
+      stripeInvoiceId: null,
+      stripeHostedInvoiceUrl: null,
+      stripeInvoicePdfUrl: null,
+    }
+  }
+
+  return {
+    stripeInvoiceId: invoice.id || null,
+    stripeHostedInvoiceUrl: invoice.hosted_invoice_url || null,
+    stripeInvoicePdfUrl: invoice.invoice_pdf || null,
+  }
+}
+
+function hasStripeInvoiceLinks(order) {
+  return Boolean(order?.stripeHostedInvoiceUrl || order?.stripeInvoicePdfUrl)
+}
+
+async function recoverStripeInvoiceLinks(order, stripe) {
+  if (!stripe || !order?.stripeSessionId) return null
+
+  const session = await stripe.checkout.sessions.retrieve(order.stripeSessionId, {
+    expand: ['invoice'],
+  })
+
+  if (session.invoice && typeof session.invoice === 'object') {
+    return extractInvoiceLinks(session.invoice)
+  }
+
+  if (typeof session.invoice === 'string') {
+    const invoice = await stripe.invoices.retrieve(session.invoice)
+    return extractInvoiceLinks(invoice)
+  }
+
+  return null
+}
+
 async function listOrders(req, res) {
   try {
     const snapshot = await db.collection('orders').get()
@@ -170,9 +209,34 @@ async function createOrder(req, res) {
 
 async function listUserOrders(req, res) {
   const userId = req.user.id
+  const stripe = getStripeClient()
   try {
     const snapshot = await db.collection('orders').where('userId', '==', userId).get()
-    const orders = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+    const orders = await Promise.all(snapshot.docs.map(async (doc) => {
+      const order = { id: doc.id, ...doc.data() }
+
+      if (order.status === 'awaiting_payment' || hasStripeInvoiceLinks(order)) {
+        return order
+      }
+
+      try {
+        const recoveredInvoiceLinks = await recoverStripeInvoiceLinks(order, stripe)
+        if (!recoveredInvoiceLinks || !hasStripeInvoiceLinks(recoveredInvoiceLinks)) {
+          return order
+        }
+
+        await doc.ref.update({
+          ...recoveredInvoiceLinks,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        })
+
+        return { ...order, ...recoveredInvoiceLinks }
+      } catch (stripeError) {
+        console.warn('Could not backfill Stripe invoice links:', stripeError.message)
+        return order
+      }
+    }))
+
     return res.json(orders)
   } catch (error) {
     console.error('listUserOrders error:', error)
@@ -182,7 +246,9 @@ async function listUserOrders(req, res) {
 
 async function getOrderInvoice(req, res) {
   const { id } = req.params
-  const disposition = req.query.disposition === 'download' ? 'attachment' : 'inline'
+  const wantsDownload = req.query.disposition === 'download'
+  const disposition = wantsDownload ? 'attachment' : 'inline'
+  const responseMode = req.query.response === 'json' ? 'json' : 'file'
   const stripe = getStripeClient()
 
   try {
@@ -201,6 +267,35 @@ async function getOrderInvoice(req, res) {
 
     if (order.status === 'awaiting_payment') {
       return res.status(400).json({ message: 'Invoice not available before payment confirmation' })
+    }
+
+    if (!hasStripeInvoiceLinks(order)) {
+      try {
+        const recoveredInvoiceLinks = await recoverStripeInvoiceLinks(order, stripe)
+        if (recoveredInvoiceLinks && hasStripeInvoiceLinks(recoveredInvoiceLinks)) {
+          await docRef.update({
+            ...recoveredInvoiceLinks,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          })
+          order = { ...order, ...recoveredInvoiceLinks }
+        }
+      } catch (stripeError) {
+        console.warn('Could not recover Stripe invoice links:', stripeError.message)
+      }
+    }
+
+    const stripeRedirectUrl = wantsDownload
+      ? order.stripeInvoicePdfUrl || order.stripeHostedInvoiceUrl
+      : order.stripeHostedInvoiceUrl || order.stripeInvoicePdfUrl
+
+    if (stripeRedirectUrl) {
+      if (responseMode === 'json') {
+        return res.json({
+          source: 'stripe',
+          url: stripeRedirectUrl,
+        })
+      }
+      return res.redirect(302, stripeRedirectUrl)
     }
 
     // Backfill shipping details for older orders when possible.
@@ -228,6 +323,13 @@ async function getOrderInvoice(req, res) {
     }
 
     const pdfBuffer = await createInvoicePdf(order)
+
+    if (responseMode === 'json') {
+      return res.json({
+        source: 'generated',
+        url: null,
+      })
+    }
 
     res.setHeader('Content-Type', 'application/pdf')
     res.setHeader('Content-Disposition', `${disposition}; filename="invoice-${order.id}.pdf"`)

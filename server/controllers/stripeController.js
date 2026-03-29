@@ -9,6 +9,22 @@ function getStripeClient() {
   return Stripe(secret)
 }
 
+function extractInvoiceLinks(invoice) {
+  if (!invoice || typeof invoice !== 'object') {
+    return {
+      stripeInvoiceId: null,
+      stripeHostedInvoiceUrl: null,
+      stripeInvoicePdfUrl: null,
+    }
+  }
+
+  return {
+    stripeInvoiceId: invoice.id || null,
+    stripeHostedInvoiceUrl: invoice.hosted_invoice_url || null,
+    stripeInvoicePdfUrl: invoice.invoice_pdf || null,
+  }
+}
+
 // Mirrors the bundle discount logic from the frontend store
 function calculateBundleDiscount(cart) {
   const bundleCategories = ['mice', 'keyboards', 'headsets']
@@ -64,6 +80,9 @@ async function createCheckoutSession(req, res) {
       customer_email: email || userEmail || undefined,
       line_items: lineItems,
       discounts,
+      invoice_creation: {
+        enabled: true,
+      },
       shipping_address_collection: {
         allowed_countries: ['US', 'GB', 'DE', 'FR', 'RO', 'IT', 'ES', 'NL', 'BE', 'AT', 'PL', 'CZ', 'HU', 'SK', 'SI', 'HR', 'BG', 'SE', 'DK', 'FI', 'NO', 'CH'],
       },
@@ -107,7 +126,9 @@ async function confirmCheckoutSession(req, res) {
   }
 
   try {
-    const session = await stripe.checkout.sessions.retrieve(sessionId)
+    const session = await stripe.checkout.sessions.retrieve(sessionId, {
+      expand: ['invoice'],
+    })
 
     if (session.payment_status !== 'paid') {
       return res.status(402).json({ message: 'Payment not completed' })
@@ -156,6 +177,23 @@ async function confirmCheckoutSession(req, res) {
         })
       }
 
+      let invoiceLinks = {
+        stripeInvoiceId: null,
+        stripeHostedInvoiceUrl: null,
+        stripeInvoicePdfUrl: null,
+      }
+
+      if (session.invoice && typeof session.invoice === 'object') {
+        invoiceLinks = extractInvoiceLinks(session.invoice)
+      } else if (typeof session.invoice === 'string') {
+        try {
+          const invoice = await stripe.invoices.retrieve(session.invoice)
+          invoiceLinks = extractInvoiceLinks(invoice)
+        } catch (invoiceError) {
+          console.warn('Could not load Stripe invoice details:', invoiceError.message)
+        }
+      }
+
       tx.update(orderRef, {
         status: 'pending',
         shippingDetails: {
@@ -167,6 +205,7 @@ async function confirmCheckoutSession(req, res) {
           postalCode: session.shipping_details?.address?.postal_code || session.customer_details?.address?.postal_code || '',
           country: session.shipping_details?.address?.country || session.customer_details?.address?.country || '',
         },
+        ...invoiceLinks,
         paidAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       })

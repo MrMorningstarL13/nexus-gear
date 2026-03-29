@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { User, Mail, Calendar, LogOut, ShoppingBag, Heart, Settings, FileText, Download } from 'lucide-react'
+import { User, Mail, Calendar, LogOut, ShoppingBag, Heart, Settings, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Navbar } from '@/components/navbar'
@@ -76,10 +76,43 @@ export default function AccountPage() {
     return new Date().toLocaleDateString()
   }
 
-  const openInvoice = async (orderId: string, disposition: 'inline' | 'download') => {
+  const openInvoice = async (orderId: string, opts?: { hostedUrl?: string | null; pdfUrl?: string | null }) => {
+    const stripeTargetUrl = opts?.hostedUrl || opts?.pdfUrl
+    if (stripeTargetUrl) {
+      const anchor = document.createElement('a')
+      anchor.href = stripeTargetUrl
+      anchor.target = '_blank'
+      anchor.rel = 'noopener noreferrer'
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      return
+    }
+
     try {
       const token = localStorage.getItem('token')
-      const res = await fetch(buildApiUrl(`/api/orders/${orderId}/invoice?disposition=${disposition === 'download' ? 'download' : 'inline'}`), {
+      const invoiceParams = 'disposition=inline'
+
+      // Ask API for the Stripe invoice URL in JSON form first to avoid cross-origin fetch redirects.
+      const resolveRes = await fetch(buildApiUrl(`/api/orders/${orderId}/invoice?${invoiceParams}&response=json`), {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+
+      if (resolveRes.ok) {
+        const resolved = await resolveRes.json().catch(() => ({} as { url?: string | null }))
+        if (resolved?.url) {
+          const link = document.createElement('a')
+          link.href = resolved.url
+          link.target = '_blank'
+          link.rel = 'noopener noreferrer'
+          document.body.appendChild(link)
+          link.click()
+          link.remove()
+          return
+        }
+      }
+
+      const res = await fetch(buildApiUrl(`/api/orders/${orderId}/invoice?disposition=inline`), {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
 
@@ -90,17 +123,7 @@ export default function AccountPage() {
 
       const blob = await res.blob()
       const blobUrl = window.URL.createObjectURL(blob)
-
-      if (disposition === 'download') {
-        const link = document.createElement('a')
-        link.href = blobUrl
-        link.download = `invoice-${orderId}.pdf`
-        document.body.appendChild(link)
-        link.click()
-        link.remove()
-      } else {
-        window.open(blobUrl, '_blank', 'noopener,noreferrer')
-      }
+      window.open(blobUrl, '_blank', 'noopener,noreferrer')
 
       window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 5000)
     } catch (error) {
@@ -255,19 +278,13 @@ export default function AccountPage() {
                               size="sm"
                               variant="outline"
                               className="h-8 gap-1"
-                              onClick={() => openInvoice(order.id, 'inline')}
+                              onClick={() => openInvoice(order.id, {
+                                hostedUrl: order.stripeHostedInvoiceUrl,
+                                pdfUrl: order.stripeInvoicePdfUrl,
+                              })}
                             >
                               <FileText className="h-3.5 w-3.5" />
-                              View
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 gap-1"
-                              onClick={() => openInvoice(order.id, 'download')}
-                            >
-                              <Download className="h-3.5 w-3.5" />
-                              Download
+                              View Invoice
                             </Button>
                           </div>
                         </div>
