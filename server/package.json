@@ -1,0 +1,22 @@
+{
+  "name": "nexus-gear-server",
+  "version": "0.1.0",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "firebase": "^12.11.0",
+    "firebase-admin": "^13.7.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "pdfkit": "^0.18.0",
+    "stripe": "^21.0.1"
+  }
+}
