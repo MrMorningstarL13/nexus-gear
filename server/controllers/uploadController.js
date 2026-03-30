@@ -1,16 +1,83 @@
 const { randomUUID } = require('crypto')
+const Busboy = require('busboy')
 const { admin } = require('../firestore')
+
+function parseMultipartRequest(req) {
+  return new Promise((resolve, reject) => {
+    const contentType = req.headers['content-type'] || ''
+    if (!contentType.includes('multipart/form-data')) {
+      reject(new Error('Content-Type must be multipart/form-data'))
+      return
+    }
+
+    const busboy = Busboy({
+      headers: req.headers,
+      limits: {
+        files: 1,
+        fileSize: 10 * 1024 * 1024,
+      },
+    })
+
+    let productName = ''
+    let fileBuffer = null
+    let fileMimeType = ''
+    let gotFile = false
+
+    busboy.on('field', (fieldname, value) => {
+      if (fieldname === 'productName') {
+        productName = value
+      }
+    })
+
+    busboy.on('file', (_fieldname, file, info) => {
+      gotFile = true
+      fileMimeType = info.mimeType || ''
+      const chunks = []
+
+      file.on('data', (chunk) => {
+        chunks.push(chunk)
+      })
+
+      file.on('limit', () => {
+        reject(new Error('File too large (max 10MB)'))
+      })
+
+      file.on('end', () => {
+        fileBuffer = Buffer.concat(chunks)
+      })
+    })
+
+    busboy.on('error', (error) => {
+      reject(error)
+    })
+
+    busboy.on('finish', () => {
+      resolve({ productName, fileBuffer, fileMimeType, gotFile })
+    })
+
+    if (req.rawBody && req.rawBody.length > 0) {
+      busboy.end(req.rawBody)
+      return
+    }
+
+    req.pipe(busboy)
+  })
+}
 
 async function uploadProductImage(req, res) {
   try {
-    if (!req.file) {
+    const { productName, fileBuffer, fileMimeType, gotFile } = await parseMultipartRequest(req)
+
+    if (!gotFile || !fileBuffer || fileBuffer.length === 0) {
       return res.status(400).json({ message: 'No file uploaded' })
     }
 
-    const { productName } = req.body
-
     if (!productName) {
       return res.status(400).json({ message: 'Product name is required' })
+    }
+
+    if (fileMimeType !== 'image/png') {
+      return res.status(400).json({ message: 'Only PNG images are allowed' })
     }
 
     // Generate filename from product name in kebab-case and enforce .png.
@@ -42,7 +109,7 @@ async function uploadProductImage(req, res) {
     }
 
     const token = randomUUID()
-    await file.save(req.file.buffer, {
+    await file.save(fileBuffer, {
       resumable: false,
       contentType: 'image/png',
       metadata: {
@@ -63,7 +130,10 @@ async function uploadProductImage(req, res) {
   } catch (error) {
     console.error('uploadProductImage error:', error)
 
-    return res.status(500).json({ message: 'Failed to upload image' })
+    return res.status(500).json({
+      message: 'Failed to upload image',
+      detail: error instanceof Error ? error.message : 'Unknown upload error',
+    })
   }
 }
 
