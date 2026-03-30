@@ -278,8 +278,8 @@ const products = [
     name: 'SteelSeries Arctis Nova Pro Wireless',
     category: 'headsets',
     price: 349.99,
-    image: '/products/steelseries-arctis-nova-pro-wireless.png',
-    images: ['/products/steelseries-arctis-nova-pro-wireless.png'],
+    image: '/products/arctis_nova_pro_wl_black_img.png',
+    images: ['products/arctis_nova_pro_wl_black_img.png'],
     description: 'Premium wireless gaming headset with Active Noise Cancellation, Hi-Res Audio, and hot-swappable battery system.',
     specs: {
       'Driver Size': '40mm Neodymium',

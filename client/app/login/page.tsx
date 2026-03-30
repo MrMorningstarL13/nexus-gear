@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { useStore } from '@/lib/store'
+import { toast } from '@/hooks/use-toast'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -25,7 +26,12 @@ export default function LoginPage() {
 
     try {
       await login(formData.email, formData.password)
-      router.push('/')
+      const loggedInUser = useStore.getState().user
+      toast({
+        title: 'Signed in',
+        description: `Welcome back${loggedInUser?.name ? `, ${loggedInUser.name}` : ''}.`,
+      })
+      router.push(loggedInUser?.isAdmin ? '/admin' : '/')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
     }

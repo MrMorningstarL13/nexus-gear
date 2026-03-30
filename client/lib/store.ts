@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { buildApiUrl } from './api-base'
+import { toast } from '@/hooks/use-toast'
 
 // Types
 export type Category = 'mice' | 'keyboards' | 'headsets' | 'mousepads'
@@ -85,10 +86,19 @@ const apiRequest = async (endpoint: string, options?: RequestInit) => {
 export const api = {
   // Products
   getProducts: () => apiRequest('/api/products'),
+  createProduct: (product: Omit<Product, 'id'>) =>
+    apiRequest('/api/products', {
+      method: 'POST',
+      body: JSON.stringify(product),
+    }),
   updateProduct: (id: string, updates: Partial<Product>) => 
     apiRequest(`/api/products/${id}`, {
       method: 'PUT',
       body: JSON.stringify(updates),
+    }),
+  deleteProduct: (id: string) =>
+    apiRequest(`/api/products/${id}`, {
+      method: 'DELETE',
     }),
   
   // Orders
@@ -151,6 +161,8 @@ interface StoreState {
   fetchProducts: () => Promise<void>
   setProducts: (products: Product[]) => void
   updateProduct: (id: string, updates: Partial<Product>) => Promise<void>
+  deleteProduct: (id: string) => Promise<void>
+  createProduct: (product: Omit<Product, 'id'>) => Promise<Product>
   
   // Cart
   cart: CartItem[]
@@ -263,21 +275,56 @@ export const useStore = create<StoreState>()(
           }))
         }
       },
+      deleteProduct: async (id) => {
+        try {
+          await api.deleteProduct(id)
+          set((state) => ({
+            products: state.products.filter((p) => p.id !== id)
+          }))
+        } catch (error) {
+          set((state) => ({
+            errors: { ...state.errors, products: error instanceof Error ? error.message : 'Failed to delete product' }
+          }))
+          throw error
+        }
+      },
+      
+      createProduct: async (product) => {
+        try {
+          const created = await api.createProduct(product)
+          set((state) => ({
+            products: [...state.products, created]
+          }))
+          return created
+        } catch (error) {
+          set((state) => ({
+            errors: { ...state.errors, products: error instanceof Error ? error.message : 'Failed to create product' }
+          }))
+          throw error
+        }
+      },
       
       // Cart
       cart: [],
       addToCart: (product, quantity = 1) => set((state) => {
         const existing = state.cart.find((item) => item.product.id === product.id)
+        const nextQuantity = Math.max(1, quantity)
+
+        toast({
+          title: 'Added to cart',
+          description: `${product.name} x${nextQuantity}`,
+        })
+
         if (existing) {
           return {
             cart: state.cart.map((item) =>
               item.product.id === product.id
-                ? { ...item, quantity: item.quantity + quantity }
+                ? { ...item, quantity: item.quantity + nextQuantity }
                 : item
             )
           }
         }
-        return { cart: [...state.cart, { product, quantity }] }
+        return { cart: [...state.cart, { product, quantity: nextQuantity }] }
       }),
 
       // Wishlist
@@ -318,16 +365,39 @@ export const useStore = create<StoreState>()(
         const state = get()
         return state.wishlist.some((item) => item.id === productId)
       },
-      removeFromCart: (productId) => set((state) => ({
-        cart: state.cart.filter((item) => item.product.id !== productId)
-      })),
-      updateQuantity: (productId, quantity) => set((state) => ({
-        cart: quantity <= 0
-          ? state.cart.filter((item) => item.product.id !== productId)
-          : state.cart.map((item) =>
-              item.product.id === productId ? { ...item, quantity } : item
-            )
-      })),
+      removeFromCart: (productId) => {
+        const removedItem = get().cart.find((item) => item.product.id === productId)
+        set((state) => ({
+          cart: state.cart.filter((item) => item.product.id !== productId)
+        }))
+
+        if (removedItem) {
+          toast({
+            title: 'Removed from cart',
+            description: removedItem.product.name,
+          })
+        }
+      },
+      updateQuantity: (productId, quantity) => {
+        const removedItem = quantity <= 0
+          ? get().cart.find((item) => item.product.id === productId)
+          : null
+
+        set((state) => ({
+          cart: quantity <= 0
+            ? state.cart.filter((item) => item.product.id !== productId)
+            : state.cart.map((item) =>
+                item.product.id === productId ? { ...item, quantity } : item
+              )
+        }))
+
+        if (removedItem) {
+          toast({
+            title: 'Removed from cart',
+            description: removedItem.product.name,
+          })
+        }
+      },
       clearCart: () => set({ cart: [] }),
       getCartTotal: () => {
         const state = get()
@@ -416,6 +486,10 @@ export const useStore = create<StoreState>()(
       logout: () => {
         localStorage.removeItem('token')
         set({ user: null, wishlist: [] })
+        toast({
+          title: 'Signed out',
+          description: 'You have been logged out successfully.',
+        })
       },
       setUser: (user) => set({ user }),
       

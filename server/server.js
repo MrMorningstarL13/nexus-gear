@@ -8,6 +8,7 @@ const orderRoutes = require('./routes/orderRoutes')
 const authRoutes = require('./routes/authRoutes')
 const wishlistRoutes = require('./routes/wishlistRoutes')
 const stripeRoutes = require('./routes/stripeRoutes')
+const uploadRoutes = require('./routes/uploadRoutes')
 
 const app = express()
 const port = process.env.APP_PORT || 8080
@@ -44,6 +45,7 @@ app.use('/api/orders', orderRoutes)
 app.use('/api/auth', authRoutes)
 app.use('/api/wishlist', wishlistRoutes)
 app.use('/api/stripe', stripeRoutes)
+app.use('/api/upload', uploadRoutes)
 
 app.get('/', (req, res) => {
   res.json({ message: 'Nexus Gear API running' })

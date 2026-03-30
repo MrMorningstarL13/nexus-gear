@@ -86,8 +86,71 @@ async function updateProduct(req, res) {
   }
 }
 
+async function deleteProduct(req, res) {
+  const { id } = req.params
+
+  try {
+    const docRef = db.collection('products').doc(id)
+    const doc = await docRef.get()
+
+    if (!doc.exists) {
+      return res.status(404).json({ message: 'Product not found' })
+    }
+
+    await docRef.delete()
+    return res.json({ message: 'Product deleted' })
+  } catch (error) {
+    console.error('deleteProduct error:', error)
+    return res.status(500).json({ message: 'Could not delete product' })
+  }
+}
+
+async function createProduct(req, res) {
+  const { name, category, price, image, images, description, specs, stockCount, discount, originalPrice, featured, inStock } = req.body
+
+  // Validation
+  if (!name || !category || !price || !image) {
+    return res.status(400).json({ message: 'Missing required fields: name, category, price, image' })
+  }
+
+  try {
+    const docRef = db.collection('products').doc()
+    const newProduct = {
+      name,
+      category,
+      price: parseFloat(price),
+      image,
+      images: images || [image],
+      description: description || '',
+      specs: specs || {},
+      stockCount: parseInt(stockCount) || 0,
+      inStock: inStock !== undefined ? inStock : (parseInt(stockCount) > 0),
+      featured: featured || false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }
+
+    // Only add optional fields if they have values
+    if (discount) {
+      newProduct.discount = parseInt(discount)
+    }
+    if (originalPrice) {
+      newProduct.originalPrice = parseFloat(originalPrice)
+    }
+
+    await docRef.set(newProduct)
+    const created = await docRef.get()
+    return res.json({ id: created.id, ...created.data() })
+  } catch (error) {
+    console.error('createProduct error:', error)
+    return res.status(500).json({ message: 'Could not create product' })
+  }
+}
+
 module.exports = {
   listProducts,
-  updateProduct
+  updateProduct,
+  deleteProduct,
+  createProduct
 }
 

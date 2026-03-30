@@ -293,31 +293,6 @@ export default function AccountPage() {
                   </div>
                 )}
               </Card>
-
-              {/* Account Settings */}
-              <Card className="p-6">
-                <h3 className="text-lg font-semibold text-foreground mb-4">Account Settings</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 border border-border rounded-lg">
-                    <div>
-                      <p className="font-medium text-foreground">Email Notifications</p>
-                      <p className="text-sm text-muted-foreground">Receive order updates and promotions</p>
-                    </div>
-                    <Button variant="outline" size="sm" disabled>
-                      Manage
-                    </Button>
-                  </div>
-                  <div className="flex items-center justify-between p-3 border border-border rounded-lg">
-                    <div>
-                      <p className="font-medium text-foreground">Privacy Settings</p>
-                      <p className="text-sm text-muted-foreground">Control your data and privacy preferences</p>
-                    </div>
-                    <Button variant="outline" size="sm" disabled>
-                      Manage
-                    </Button>
-                  </div>
-                </div>
-              </Card>
             </div>
           </div>
         </div>

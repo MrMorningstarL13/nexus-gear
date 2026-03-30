@@ -171,6 +171,15 @@ async function updateOrder(req, res) {
       return res.status(404).json({ message: 'Order not found' })
     }
 
+    const existingOrder = doc.data() || {}
+    if (
+      existingOrder.status === 'delivered' &&
+      typeof updates.status === 'string' &&
+      updates.status !== 'delivered'
+    ) {
+      return res.status(400).json({ message: 'Delivered orders cannot change status' })
+    }
+
     await docRef.update({ ...updates, updatedAt: admin.firestore.FieldValue.serverTimestamp() })
     const updated = await docRef.get()
     return res.json({ id: updated.id, ...updated.data() })

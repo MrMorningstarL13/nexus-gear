@@ -8,6 +8,7 @@ import {
   Truck,
   CheckCircle,
   Clock,
+  CreditCard,
   Mail,
   Calendar
 } from 'lucide-react'
@@ -18,6 +19,12 @@ import { useStore, Order } from '@/lib/store'
 import { cn } from '@/lib/utils'
 
 const statusConfig = {
+  awaiting_payment: {
+    label: 'Awaiting Payment',
+    icon: CreditCard,
+    color: 'text-amber-500',
+    bg: 'bg-amber-500/10'
+  },
   pending: {
     label: 'Pending',
     icon: Clock,
@@ -42,6 +49,13 @@ const statusConfig = {
     color: 'text-success',
     bg: 'bg-success/10'
   }
+}
+
+const defaultStatusConfig = {
+  label: 'Pending',
+  icon: Clock,
+  color: 'text-warning',
+  bg: 'bg-warning/10'
 }
 
 export function OrdersTable() {
@@ -69,6 +83,10 @@ export function OrdersTable() {
   }
 
   const cycleStatus = async (order: Order) => {
+    if (order.status === 'delivered') {
+      return
+    }
+
     const statuses: Order['status'][] = ['pending', 'processing', 'shipped', 'delivered']
     const currentIndex = statuses.indexOf(order.status)
     const nextStatus = statuses[(currentIndex + 1) % statuses.length]
@@ -103,7 +121,7 @@ export function OrdersTable() {
       {/* Orders List */}
       <div className="divide-y divide-border">
         {filteredOrders.map((order) => {
-          const status = statusConfig[order.status]
+          const status = statusConfig[order.status as keyof typeof statusConfig] || defaultStatusConfig
           const StatusIcon = status.icon
           const isExpanded = expandedOrder === order.id
 
@@ -201,6 +219,7 @@ export function OrdersTable() {
                       <Button
                         size="sm"
                         variant="outline"
+                        disabled={order.status === 'delivered'}
                         onClick={(e) => {
                           e.stopPropagation()
                           cycleStatus(order)
@@ -208,7 +227,7 @@ export function OrdersTable() {
                         className="gap-2"
                       >
                         <StatusIcon className="h-4 w-4" />
-                        Update Status
+                        {order.status === 'delivered' ? 'Final Status' : 'Update Status'}
                       </Button>
                       <div className="text-right">
                         <p className="text-xs text-muted-foreground">Total</p>

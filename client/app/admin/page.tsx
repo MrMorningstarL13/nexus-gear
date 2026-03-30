@@ -25,7 +25,7 @@ type Tab = 'inventory' | 'orders'
 
 export default function AdminPage() {
   const router = useRouter()
-  const { user, setUser, products, orders, fetchOrders } = useStore()
+  const { user, logout, products, orders, fetchOrders } = useStore()
   const [activeTab, setActiveTab] = useState<Tab>('inventory')
 
   useEffect(() => {
@@ -39,7 +39,7 @@ export default function AdminPage() {
   }, [user, router, fetchOrders])
 
   const handleLogout = () => {
-    setUser(null)
+    logout()
     router.push('/')
   }
 
