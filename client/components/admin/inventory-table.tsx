@@ -495,7 +495,7 @@ export function InventoryTable() {
               <input
                 id="image"
                 type="file"
-                accept="image/png,image/jpeg,image/jpg,image/webp"
+                accept="image/png"
                 onChange={(e) => {
                   const file = e.target.files?.[0]
                   if (file) {

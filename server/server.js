@@ -2,6 +2,7 @@ require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
 const morgan = require('morgan')
+const path = require('path')
 
 const productRoutes = require('./routes/productRoutes')
 const orderRoutes = require('./routes/orderRoutes')
@@ -39,6 +40,9 @@ app.use(cors({
 }))
 app.use(express.json())
 app.use(morgan('dev'))
+
+// Serve static files from public directory
+app.use(express.static(path.join(__dirname, 'public')))
 
 app.use('/api/products', productRoutes)
 app.use('/api/orders', orderRoutes)
