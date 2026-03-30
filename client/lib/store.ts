@@ -651,10 +651,7 @@ export const useStore = create<StoreState>()(
         return {
           ...currentState,
           user: persisted.user ?? currentState.user,
-          cart: (persisted.cart || []).filter(item => {
-            // Only keep cart items for products that still exist
-            return currentState.products.some(p => p.id === item.product.id)
-          }),
+          cart: persisted.cart ?? currentState.cart,
           // Wishlists are now per-user and cleared on logout/login
           wishlist: []
         }

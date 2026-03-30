@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useStore } from '@/lib/store';
 import { Card } from '@/components/ui/card';
@@ -11,6 +11,11 @@ export default function CheckoutPage() {
   const { cart, getCartTotal, getBundleDiscount, user, clearCart } = useStore();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   const subtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   const { discount } = getBundleDiscount();
@@ -51,7 +56,9 @@ export default function CheckoutPage() {
       <div className="w-full max-w-2xl space-y-8">
         <Card className="p-8">
           <h1 className="text-2xl font-bold mb-6">Order Summary</h1>
-          {cart.length === 0 ? (
+          {!hydrated ? (
+            <div className="text-center text-muted-foreground py-4">Loading...</div>
+          ) : cart.length === 0 ? (
             <Alert variant="destructive">Your cart is empty.</Alert>
           ) : (
             <div className="space-y-4 mb-6">

@@ -331,21 +331,12 @@ async function getOrderInvoice(req, res) {
       }
     }
 
-    const pdfBuffer = await createInvoicePdf(order)
-
-    if (responseMode === 'json') {
-      return res.json({
-        source: 'generated',
-        url: null,
-      })
-    }
-
-    res.setHeader('Content-Type', 'application/pdf')
-    res.setHeader('Content-Disposition', `${disposition}; filename="invoice-${order.id}.pdf"`)
-    return res.send(pdfBuffer)
+    return res.status(409).json({
+      message: 'Stripe invoice is not available for this order',
+    })
   } catch (error) {
     console.error('getOrderInvoice error:', error)
-    return res.status(500).json({ message: 'Could not generate invoice' })
+    return res.status(500).json({ message: 'Could not fetch Stripe invoice' })
   }
 }
 

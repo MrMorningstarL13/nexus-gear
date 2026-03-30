@@ -51,17 +51,29 @@ async function createCheckoutSession(req, res) {
   }
 
   try {
-    const lineItems = cart.map((item) => ({
-      price_data: {
-        currency: 'eur',
-        product_data: {
-          name: item.product.name,
-          images: item.product.image ? [`http://localhost:3000${item.product.image}`] : [],
+    const lineItems = cart.map((item) => {
+      let images = []
+      if (item.product.image) {
+        const img = item.product.image
+        if (img.startsWith('http://') || img.startsWith('https://')) {
+          images = [img]
+        } else if (CLIENT_URL && CLIENT_URL.startsWith('http')) {
+          images = [`${CLIENT_URL}${img}`]
+        }
+        // If we can't form a valid public URL, skip images – Stripe treats them as optional
+      }
+      return {
+        price_data: {
+          currency: 'eur',
+          product_data: {
+            name: item.product.name,
+            images,
+          },
+          unit_amount: Math.round(item.product.price * 100),
         },
-        unit_amount: Math.round(item.product.price * 100),
-      },
-      quantity: item.quantity,
-    }))
+        quantity: item.quantity,
+      }
+    })
 
     const discountPercent = calculateBundleDiscount(cart)
     let discounts = []

@@ -93,39 +93,28 @@ export default function AccountPage() {
       const token = localStorage.getItem('token')
       const invoiceParams = 'disposition=inline'
 
-      // Ask API for the Stripe invoice URL in JSON form first to avoid cross-origin fetch redirects.
+      // Ask API for Stripe invoice URL in JSON form to avoid cross-origin fetch redirects.
       const resolveRes = await fetch(buildApiUrl(`/api/orders/${orderId}/invoice?${invoiceParams}&response=json`), {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
 
-      if (resolveRes.ok) {
-        const resolved = await resolveRes.json().catch(() => ({} as { url?: string | null }))
-        if (resolved?.url) {
-          const link = document.createElement('a')
-          link.href = resolved.url
-          link.target = '_blank'
-          link.rel = 'noopener noreferrer'
-          document.body.appendChild(link)
-          link.click()
-          link.remove()
-          return
-        }
+      if (!resolveRes.ok) {
+        const body = await resolveRes.json().catch(() => ({} as { message?: string }))
+        throw new Error(body.message || 'Stripe invoice is not available yet')
       }
 
-      const res = await fetch(buildApiUrl(`/api/orders/${orderId}/invoice?disposition=inline`), {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      })
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.message || 'Could not generate invoice')
+      const resolved = await resolveRes.json().catch(() => ({} as { url?: string | null; message?: string }))
+      if (!resolved?.url) {
+        throw new Error(resolved?.message || 'Stripe invoice is not available yet')
       }
 
-      const blob = await res.blob()
-      const blobUrl = window.URL.createObjectURL(blob)
-      window.open(blobUrl, '_blank', 'noopener,noreferrer')
-
-      window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 5000)
+      const link = document.createElement('a')
+      link.href = resolved.url
+      link.target = '_blank'
+      link.rel = 'noopener noreferrer'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
     } catch (error) {
       console.error('Invoice error:', error)
       alert(error instanceof Error ? error.message : 'Could not open invoice')

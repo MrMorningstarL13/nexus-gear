@@ -4,8 +4,25 @@ const path = require('path')
 
 const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT || './ServiceAccountKey.json'
 
+function readServiceAccountProjectId() {
+  try {
+    const resolvedPath = path.isAbsolute(serviceAccountPath)
+      ? serviceAccountPath
+      : path.resolve(__dirname, serviceAccountPath)
+
+    if (!fs.existsSync(resolvedPath)) {
+      return undefined
+    }
+
+    const serviceAccount = require(resolvedPath)
+    return serviceAccount.project_id
+  } catch (error) {
+    return undefined
+  }
+}
+
 function resolveStorageBucket() {
-  const explicitBucket = process.env.FIREBASE_STORAGE_BUCKET
+  const explicitBucket = process.env.STORAGE_BUCKET
   if (explicitBucket && explicitBucket.trim()) {
     return explicitBucket.replace(/^gs:\/\//, '').trim()
   }
@@ -22,9 +39,9 @@ function resolveStorageBucket() {
     }
   }
 
-  const projectId = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT
+  const projectId = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || readServiceAccountProjectId()
   if (projectId) {
-    return `${projectId}.appspot.com`
+    return `${projectId}.firebasestorage.app`
   }
 
   return undefined
